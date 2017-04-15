@@ -1,0 +1,22 @@
+---
+- name: Installing essentials
+  apt:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - libcairo2-dev
+    - libffi-dev
+    - fontconfig
+    - collectd
+    - collectd-utils
+  register: installed_essentials
+
+- name: Fetching required repo
+  git:
+    repo: "{{ item.repo }}"
+    dest: "{{ MONITORING_SRC_DIR }}/{{ item.name }}"
+  with_items:
+    - {name: "graphite", repo: "https://github.com/graphite-project/graphite-web.git"}
+    - {name: "carbon", repo: "https://github.com/graphite-project/carbon.git"}
+    - {name: "whisper", repo: "https://github.com/graphite-project/whisper.git"}
+  register: fetched_repo

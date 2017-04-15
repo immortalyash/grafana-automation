@@ -1,0 +1,105 @@
+---
+- name: Installing requirements
+  pip:
+    name: "{{ item }}"
+    state: present
+    virtualenv: "{{ MONITORING_VENV_NAME }}"
+    virtualenv_python: python2.7
+  with_items:
+    - psycopg2
+
+- name: Installing graphite
+  shell: "source {{ MONITORING_VENV_DIR }}/bin/activate && python check-dependencies.py && sudo python setup.py install"
+  args:
+    executable: /bin/bash
+    chdir: /usr/local/src/graphite
+    creates: /opt/graphite/conf/graphite.wsgi.example
+  register: installed_graphite
+
+- name: Copying graphite conf & wsgi to server
+  template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+  with_items:
+    - {src: "templates/graphite/webapp/local_settings.py", dest: "{{ GRAPHITE_DIR }}/webapp/graphite/"}
+    - {src: "templates/graphite/webapp/graphite.wsgi", dest: "{{ GRAPHITE_DIR }}/webapp/graphite/"}
+  when: installed_graphite|success
+ 
+- name: Creating user
+  become: true
+  become_user: postgres
+  postgresql_user:
+    name: "{{ GRAPHITE_DB_USER }}"
+    password: "{{ GRAPHITE_DB_PASS }}"
+    state: present
+  register: user_created
+ 
+- name: Creating database for graphite
+  become: true
+  become_user: postgres
+  postgresql_db:
+    name: "{{ GRAPHITE_DB_NAME }}"
+    owner: "{{ GRAPHITE_DB_USER }}"
+    state: present
+  when: user_created|success
+  register: database_created
+
+- name: Adding permission for log folder
+  file:
+    path: "{{ GRAPHITE_DIR }}/storage/log"
+    mode: 0777
+    recurse: yes
+
+- name: Migrate database to postgresql
+  shell: "source {{ MONITORING_VENV_DIR }}/bin/activate && PYTHONPATH={{ GRAPHITE_DIR }}/webapp django-admin.py migrate --settings=graphite.settings && source {{ MONITORING_VENV_DIR }}/bin/activate && PYTHONPATH={{ GRAPHITE_DIR }}/webapp django-admin.py migrate --settings=graphite.settings --run-syncdb"
+  args:
+    executable: /bin/bash
+  register: database_migrated
+  when: 
+    - installed_graphite|success
+    - user_created|success
+    - database_created|success
+
+- name: Collect static components
+  shell: "source {{ MONITORING_VENV_DIR }}/bin/activate && PYTHONPATH={{ GRAPHITE_DIR }}/webapp django-admin.py collectstatic --settings=graphite.settings --noinput"
+  args:
+    executable: /bin/bash
+  when: database_migrated|success
+
+- name: Copying gunicorn conf for monitoring
+  template:
+    src: templates/graphite/conf/gunicorn_monitoring
+    dest: "{{ GRAPHITE_DIR }}/gunicorn_monitor"
+    mode: a+r
+  when: database_migrated|success
+  register: gunicorn_installed
+
+- name: Copying supervisor conf & nginx conf for monitoring
+  template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+  with_items:
+    - {src: "templates/graphite/conf/supervisor.conf", dest: "{{ SUPERVISOR_DIR }}/conf.d/{{ MONITORING_CONF }}"}
+    - {src: "templates/graphite/conf/nginx.conf", dest: "{{ NGINX_DIR }}/sites-available/{{ MONITORING_CONF }}"}
+  when: 
+    - database_migrated|success
+    - gunicorn_installed|success
+  register: nginx_conf
+
+- name: Creating supervisor log, nginx access & error log
+  file:
+    path: "{{ item }}"
+    state: touch
+    mode: 0777
+  with_items:
+    - "{{ MONITORING_SUPERVISOR_LOG }}"
+    - "{{ MONITORING_ACCESS_LOG }}"
+    - "{{ MONITORING_ERROR_LOG }}"
+  when: nginx_conf|success
+                                            
+- name: Enabling copied nginx conf
+  file:
+    src: "{{ NGINX_DIR }}/sites-available/{{ MONITORING_CONF }}"
+    dest: "{{ NGINX_DIR }}/sites-enabled/{{ MONITORING_CONF }}"
+    state: link
+  when: nginx_conf|success

@@ -1,0 +1,97 @@
+---
+- name: Copying grafana package to server
+  copy:
+    src: templates/{{ GRAFANA_PACKAGE }}
+    dest: ~/{{ GRAFANA_PACKAGE }}
+  register: grafana_copy
+
+- name: Installing grafana server
+  become: true
+  become_method: sudo
+  shell: dpkg -i ~/{{ GRAFANA_PACKAGE }}
+  args:
+    creates: /usr/sbin/grafana-server
+    executable: /bin/bash
+  when: grafana_copy|success
+  register: grafana_setup
+  notify:
+    - Force reload supervisor
+    - Restart Service | Nginx
+    - Enable Service | Grafana
+
+- name: Clean up packages
+  file:
+    path: ~/{{ GRAFANA_PACKAGE }}
+    state: absent
+  when: grafana_setup|success
+
+- name: Creating database for grafana
+  become: true
+  become_user: postgres
+  postgresql_db:
+    name: "{{ GRAFANA_DB_NAME }}"
+    owner: "{{ GRAFANA_DB_USER }}"
+    state: present
+  when: grafana_setup|success
+  register: grafana_db
+
+- name: Changing app mode in grafana.ini
+  become: true
+  become_method: sudo
+  lineinfile:
+    backrefs: yes
+    dest: "{{ GRAFANA_CONF }}"
+    line: "app_mode = production"
+    regexp: "; app_mode = production"
+    state: present
+  when: grafana_setup|success
+
+- name: Adding server block in grafana.ini
+  become: true
+  become_method: sudo
+  blockinfile:
+    block: |
+      protocol = http
+      http_addr = 127.0.0.1
+      domain = monitor.{{ DOMAIN }}
+      enforce_domain = true
+    dest: "{{ GRAFANA_CONF }}"
+    insertafter: "# Protocol"
+    marker: "# {mark} Server settings"
+    state: present
+  when: grafana_setup|success
+
+- name: Adding database settings in grafana.ini
+  become: true
+  become_method: sudo
+  blockinfile: 
+    block: |
+      type = postgres
+      host = 127.0.0.1:5432
+      name = {{ GRAFANA_DB_NAME }}
+      user = {{ GRAFANA_DB_USER }}
+      password = {{ GRAFANA_DB_PASS }}
+    dest: "{{ GRAFANA_CONF }}"
+    insertafter: "# Either \"mysql\", \"postgres\" or \"sqlite3\", it's your choice"
+    marker: "# {mark} Postgresql settings"
+    state: present
+  when: 
+    - grafana_setup|success
+    - grafana_db|success
+  
+- name: Adding user block in grafana.ini
+  become: true
+  become_method: sudo
+  blockinfile:
+    block: |
+      allow_sign_up = false
+      allow_org_create = false
+    dest: "{{ GRAFANA_CONF }}"
+    insertafter: "# disable user signup / registration"
+    marker: "# {mark} User settings"
+    state: present
+  when: grafana_setup|success
+  register: grafana_config
+  notify:
+    - Restart Service | Grafana
+    - Restart Service | Nginx

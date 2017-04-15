@@ -1,0 +1,31 @@
+---
+- name: Configuring virtualenv for graphite
+  become: true
+  become_method: sudo
+  shell: "virtualenv {{ MONITORING_VENV_NAME }}"
+  args:
+    executable: /bin/bash
+    creates: "{{ MONITORING_VENV_DIR }}" 
+  register: venv_created
+
+- name: Changing permission of graphite directory
+  become: true
+  become_method: sudo
+  file:
+    mode: 0777
+    path: "{{ MONITORING_VENV_DIR }}"
+    recurse: yes
+    state: directory
+  when: venv_created|success
+
+- name: Installing carbon and graphite requirements in venv
+  pip:
+    virtualenv: "{{ MONITORING_VENV_DIR }}"
+    requirements: "{{ MONITORING_SRC_DIR }}/{{ item }}/requirements.txt"
+    state: present
+    virtualenv_python: python2.7
+  with_items:
+    - carbon
+    - graphite
+  when: venv_created|success
+  register: venv_requirements

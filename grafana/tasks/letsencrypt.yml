@@ -1,0 +1,58 @@
+---
+- name: Install certbot-auto
+  become: true
+  get_url:
+    url: https://dl.eff.org/certbot-auto
+    dest: /usr/local/sbin/certbot-auto
+    mode: a+r
+  register: has_certbot
+
+- name: Creating directories
+  file:
+    path: "{{ SSL_DIR }}"
+    state: directory  
+  register: ssl_dir
+  when: has_certbot|success
+
+- name: Generate SSL
+  shell: certbot-auto certonly -a webroot --webroot-path={{ SSL_DIR }} --non-interactive --text --renew-by-default --agree-tos --email "{{ USER_EMAIL }}" --domains "{{ DOMAIN }}"
+
+  args:
+    executable: /bin/bash
+    creates: "{{ LETS_ENCRYPT_DIR }}"
+  when: ssl_dir|success
+  register: installed_ssl
+
+- name: Generate Strong Diffie-Hellman Group
+  shell: openssl dhparam -out "{{ SSL_DIR }}dhparam.pem" 2048
+  args:
+    executable: /bin/bash
+    creates: "{{ SSL_DIR }}dhparam.pem"
+  when: installed_ssl|success
+  register: generate_dhparam
+
+- name: Adding Let's Encrypt certificate on auto-renew via cron
+  become: true
+  become_method: sudo
+  cron:
+    hour: 2
+    job: /usr/local/sbin/certbot-auto renew >> /var/log/le-renew.log 
+    minute: 30
+    name: Auto-renew SSL 
+    state: present
+    weekday: 1
+  when: installed_ssl|success
+
+- name: Adding cron to reload nginx after SSL renew
+  become: true
+  become_method: sudo
+  cron:
+    hour: 2
+    job: /etc/init.d/nginx reload
+    minute: 35
+    name: Reload nginx
+    state: present
+    weekday: 1
+  when: installed_ssl|success
+  notify:
+   - Restart Service | Cron

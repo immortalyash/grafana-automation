@@ -1,0 +1,54 @@
+---
+- name: Installing Essentials
+  apt: name={{ item }} state=present
+  with_items:
+    - build-essential 
+    - python-dev
+    - git
+    - libpq-dev
+    - libffi-dev
+    - nginx
+
+- name: Installing pip
+  easy_install: name=pip state=present
+
+- name: Installing Virtual Environment
+  pip: name={{ item }} state=present
+  with_items:
+    - virtualenv
+    - virtualenvwrapper
+
+- name: Adding virtual environment wrapper to .bashrc
+  blockinfile:
+    dest: "{{ HOME_DIR }}/.bashrc"
+    marker: "# {mark} Virtual Environment Wrapper"
+    block: |
+      export WORKON_HOME=$HOME/.virtualenvs
+      export PROJECT_HOME=$HOME/Devel
+      source /usr/local/bin/virtualenvwrapper.sh
+    state: present
+    insertafter: EOF
+    create: yes
+    owner: "{{ USER }}"
+    mode: 0744
+
+- name: Activating Virtual Environment Wrapper
+  become: false
+  raw: source ~/.bashrc
+
+- name: Adding .profile incase not present
+  blockinfile:
+    dest: "{{ HOME_DIR }}/.profile"
+    marker: "# {mark} Adding lines to execute .bashrc"
+    block: |
+      if [ -n "$BASH_VERSION" ]; then
+          # include .bashrc if it exists
+          if [ -f "$HOME/.bashrc" ]; then
+              . "$HOME/.bashrc"
+          fi
+      fi
+    state: present
+    insertafter: EOF
+    create: yes
+    owner: "{{ USER }}"
+    mode: 0744

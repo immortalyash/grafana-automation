@@ -1,0 +1,72 @@
+---
+- name: Turn SSL on in nginx
+  lineinfile:
+    backrefs: yes
+    dest: "{{ NGINX_DIR }}/sites-available/{{ MONITORING_CONF }}"
+    line: "        ssl on;"
+    state: present
+    regexp: "#ssl on;"
+  when: installed_ssl|success
+
+- name: Changing SSL certificate path in nginx
+  lineinfile:
+    backrefs: yes
+    dest: "{{ NGINX_DIR }}/sites-available/{{ MONITORING_CONF }}"
+    line: "        ssl_certificate {{ LETS_ENCRYPT_DIR }}/fullchain.pem;"
+    state: present
+    regexp: "#ssl_certificate "
+  when: installed_ssl|success
+
+- name: Changing SSL certificate private key path in nginx
+  lineinfile:
+    backrefs: yes
+    dest: "{{ NGINX_DIR }}/sites-available/{{ MONITORING_CONF }}"
+    line: "        ssl_certificate_key {{ LETS_ENCRYPT_DIR }}/privkey.pem;"
+    state: present
+    regexp: "#ssl_certificate_key "
+  when: installed_ssl|success
+
+- name: Changing to SSL port
+    lineinfile:
+        backrefs: yes
+        dest: "{{ NGINX_DIR }}/sites-available/{{ MONITORING_CONF }}"
+        line: "        listen 443;"
+        state: present
+        regexp: "listen 80;"
+    when: installed_ssl|success
+    register: port_changed
+
+- name: Adding listener on port 80
+    blockinfile:
+        block: |
+
+            server {
+                listen 80;
+                server_name "{{ DOMAIN }}";
+                return 301 https://$server_name$request_uri;
+            }
+        dest: "{{ NGINX_DIR }}/sites-available/{{ MONITORING_CONF }}"
+        insertafter: EOF
+        marker: "# {mark} Added listener on port 80"
+        state: present
+    when: port_changed|success
+
+- name: Turning server cipher on
+  lineinfile:
+    backrefs: yes
+    dest: "{{ NGINX_DIR }}/sites-available/{{ MONITORING_CONF }}"
+    line: "        ssl_prefer_server_ciphers on;"
+    state: present
+    regexp: "#ssl_prefer_server_ciphers"
+  when: installed_ssl|success
+
+- name: Changing dhparam path in nginx
+  lineinfile:
+    backrefs: yes
+    dest: "{{ NGINX_DIR }}/sites-available/{{ MONITORING_CONF }}"
+    line: "        ssl_dhparam {{ SSL_DIR }}dhparam.pem;"
+    state: present
+    regexp: "#ssl_dhparam"
+  when: installed_ssl|success
+  notify:
+    - Restart Service | Nginx

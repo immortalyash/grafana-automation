@@ -1,0 +1,138 @@
+---
+- name: Changing hostname in collectd config
+  lineinfile:
+    backrefs: yes
+    dest: "{{ COLLECTD_CONF }}"
+    line: "Hostname \"{{ DOMAIN }}\""
+    regexp: "#Hostname \"localhost\""
+    state: present
+
+- name: Shutdown battery stats
+  lineinfile:
+    backrefs: yes
+    dest: "{{ COLLECTD_CONF }}"
+    line: "#LoadPlugin battery"
+    regexp: "LoadPlugin battery"
+    state: present
+
+- name: Loading CPU frequency module
+  lineinfile:
+    backrefs: yes
+    dest: "{{ COLLECTD_CONF }}"
+    line: "LoadPlugin cpufreq"
+    regexp: "#LoadPlugin cpufreq"
+    state: present
+
+- name: Removing disk module
+  lineinfile:
+    backrefs: yes
+    dest: "{{ COLLECTD_CONF }}"
+    line: "#LoadPlugin disk"
+    regexp: "LoadPlugin disk"
+    state: present
+
+- name: Removing entropy module
+  lineinfile:
+    backrefs: yes
+    dest: "{{ COLLECTD_CONF }}"
+    line: "#LoadPlugin entropy"
+    regexp: "LoadPlugin entropy"
+    state: present
+
+- name: Removing irq module
+  lineinfile:
+    backrefs: yes
+    dest: "{{ COLLECTD_CONF }}"
+    line: "#LoadPlugin irq"
+    regexp: "LoadPlugin irq"
+    state: present
+
+- name: Loading nginx module
+  lineinfile:
+    backrefs: yes
+    dest: "{{ COLLECTD_CONF }}"
+    line: "LoadPlugin nginx"
+    regexp: "#LoadPlugin nginx"
+    state: present
+
+- name: Removing rrdtool module
+  lineinfile:
+    backrefs: yes
+    dest: "{{ COLLECTD_CONF }}"
+    line: "#LoadPlugin rrdtool"
+    regexp: "LoadPlugin rrdtool"
+    state: present
+
+- name: Loading uptime module
+  lineinfile:
+    backrefs: yes
+    dest: "{{ COLLECTD_CONF }}"
+    line: "LoadPlugin uptime"
+    regexp: "#LoadPlugin uptime"
+    state: present
+
+- name: Loading write_graphite module
+  lineinfile:
+    backrefs: yes
+    dest: "{{ COLLECTD_CONF }}"
+    line: "LoadPlugin write_graphite"
+    regexp: "#LoadPlugin write_graphite"
+    state: present
+
+- name: Adding interface block in collectd
+  blockinfile:
+    block: |
+      <Plugin interface>
+          Interface "eth0"
+          IgnoreSelected false
+      </Plugin>
+    dest: "{{ COLLECTD_CONF }}"
+    insertbefore: "#<Plugin interface>"
+    marker: "# {mark} interface block"
+    state: present
+
+- name: Adding nginx block in collectd
+  blockinfile:
+    block: |
+      <Plugin "nginx">
+          URL "https://{{ DOMAIN }}/nginx_status"
+          CACert "{{ LETS_ENCRYPT_DIR }}/fullchain.pem"
+      </Plugin>
+    dest: "{{ COLLECTD_CONF }}"
+    insertbefore: "#<Plugin nginx>"
+    marker: "# {mark} nginx block"
+    state: present
+
+- name: Adding writing graphite block in collectd
+  blockinfile:
+    block: |
+      <Plugin write_graphite>
+          <Node "{{ DOMAIN }}">
+              Host "localhost"
+              Port "2003"
+              Protocol "tcp"
+              LogSendErrors true
+              Prefix "collectd."
+              StoreRates true
+              AlwaysAppendDS false
+              EscapeCharacter "_"
+          </Node>
+      </Plugin>
+    dest: "{{ COLLECTD_CONF }}"
+    insertbefore: "#<Plugin write_graphite>"
+    marker: "# {mark} write_graph block"
+    state: present
+
+- name: Adding collectd block in carbon storage config
+  blockinfile:
+    block: |
+      [collectd]
+      pattern = ^collectd.*
+      retentions = 10s:1d,1m:7d,10m:1y
+    dest: "{{ GRAPHITE_DIR }}/conf/storage-schemas.conf"
+    insertafter: "# CARBON_METRIC_PREFIX"
+    marker: "# {mark} Collectd Block"
+    state: present
+  notify:
+    - Restart Service | Carbon
+    - Restart Service | Collectd

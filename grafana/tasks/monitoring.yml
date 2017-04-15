@@ -1,0 +1,12 @@
+---
+- include: essentials.yml
+- include: fetch_graphite.yml
+- include: whisper.yml
+- include: virtualenv_graphite.yml
+- include: database.yml
+- include: carbon.yml
+- include: collectd.yml
+- include: graphite.yml
+- include: grafana.yml
+- include: letsencrypt.yml
+- include: letsencrypt_montoring.yml

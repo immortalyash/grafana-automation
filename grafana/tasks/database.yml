@@ -1,0 +1,12 @@
+---
+- name: Installing Postgresql
+  apt:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - postgresql-9.4
+    - postgresql-contrib
+    - postgresql-client-9.4
+    - python-psycopg2
+  register: installed_db
+

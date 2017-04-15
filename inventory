@@ -1,0 +1,14 @@
+internal_host ansible_host=
+external_host ansible_host=
+
+[datacenters:children]
+webservers
+dbservers
+
+[webservers]
+internal_host
+external_host
+
+[webservers:vars]
+ansible_user=
+ansible_ssh_private_key_file=host.key

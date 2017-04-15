@@ -1,0 +1,55 @@
+---
+- name: Installing Carbon
+  shell: "source {{ MONITORING_VENV_DIR }}/bin/activate && sudo python setup.py install"
+  args:
+    executable: /bin/bash
+    chdir: "{{ MONITORING_SRC_DIR }}/carbon"
+    creates: "{{ GRAPHITE_DIR }}/bin/carbon-cache.py"
+  when: 
+    - installed_essentials|success
+    - fetched_repo|success
+    - venv_requirements|success
+  register: installed_carbon
+
+- name: Creating service account for carbon
+  user: 
+    name: carbon
+    system: yes
+    home: "{{ GRAPHITE_DIR }}/lib/carbon"
+    shell: /bin/false
+    state: present
+  when: installed_carbon|success
+  register: carbon_account
+
+- name: Configure carbon and storage
+  template:
+    src: templates/graphite/conf/{{ item }}.conf
+    dest: "{{ GRAPHITE_DIR }}/conf/{{ item }}.conf"
+  with_items:
+    - carbon
+    - storage-schemas
+    - storage-aggregation
+  when: carbon_account|success
+
+- name: Setting permissions for log storage & whisper storage
+  file:
+    path: "{{ item }}"
+    owner: "{{ CARBON_USER }}"
+    group: "{{ CARBON_USER }}"
+    state: directory
+  with_items:
+    - "{{ GRAPHITE_DIR }}/storage/log"
+    - "{{ GRAPHITE_DIR }}/storage/whisper"
+  when: carbon_account|success
+
+- name: Adding carbon at boot
+  template:
+    src: templates/graphite/carbon-cache
+    dest: /etc/init.d/carbon-cache
+    mode: 0755
+  when:
+    - installed_carbon|success
+    - carbon_account|success
+  notify:
+    - Reload daemon | Systemctl
+    - Restart Service | Carbon

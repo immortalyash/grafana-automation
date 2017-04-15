@@ -1,0 +1,38 @@
+---
+- name: Start app via supervisorctl
+  supervisorctl: name={{ VENV_NAME }} state=restarted
+          
+- name: Restart Service | Supervisor
+  service: name=supervisor state=restarted
+
+- name: Restart Service | Nginx
+  service: name=nginx state=restarted
+
+- name: Restart Service | Cron
+  service: name=cron state=restarted 
+
+- name: Restart Service | Carbon
+  service: name=carbon-cache state=restarted
+
+- name: Restart Service | Collectd
+  service: name=collectd state=restarted
+
+- name: Restart Service | Grafana
+  service: name=grafana-server state=restarted
+
+- name: Enable Service | Grafana
+  service: name=grafana-server enabled=yes
+
+- name: Reload daemon | Systemctl
+  become: true
+  become_method: true
+  shell: systemctl daemon-reload
+  args:
+    executable: /bin/bash
+
+- name: Force reload supervisor
+  become: true
+  become_method: sudo
+  shell: supervisorctl reload
+  args:
+    executable: /bin/bash

@@ -1,0 +1,42 @@
+---
+USER: 
+DOMAIN_OWNER: 
+DOMAIN: 
+USER_EMAIL: 
+HOME_DIR: "/home/{{ USER }}"
+
+NGINX_LOG_DIR: /var/log/nginx/
+NGINX_ACCESS_LOG: "{{ NGINX_LOG_DIR }}nginx.{{ DOMAIN_OWNER }}.access.log"
+NGINX_ERROR_LOG: "{{ NGINX_LOG_DIR }}nginx.{{ DOMAIN_OWNER }}.error.log"
+SUPERVISOR_LOG_DIR: /etc/supervisor/logs/
+SUPERVISOR_LOG: "{{ SUPERVISOR_LOG_DIR }}gunicorn_supervisor.log"
+
+SSL_DIR: /etc/nginx/ssl/
+LETS_ENCRYPT_DIR: /etc/letsencrypt/live/{{ DOMAIN }}
+
+MONITORING_CONF: monitoring.conf    
+GRAPHITE_DIR: /opt/graphite
+GRAPHITE_PORT: 5000
+GRAPHANA_PORT: 8000
+CARBON_USER: carbon
+COLLECTD_CONF: /etc/collectd/collectd.conf
+
+GRAPHITE_SECRET_KEY: 
+GRAPHITE_DB_NAME: 
+GRAPHITE_DB_USER: 
+GRAPHITE_DB_PASS: 
+
+MONITORING_OWNER: monitor
+MONITORING_SRC_DIR: /usr/local/src
+MONITORING_VENV_NAME: /opt/graphite
+MONITORING_VENV_DIR: /opt/graphite
+MONITORING_ACCESS_LOG: "{{ NGINX_LOG_DIR }}nginx.{{ MONITORING_OWNER }}.access.log "
+MONITORING_ERROR_LOG: "{{ NGINX_LOG_DIR }}nginx.{{ MONITORING_OWNER }}.error.log"
+MONITORING_SUPERVISOR_LOG: "{{ SUPERVISOR_LOG_DIR }}gunicorn_supervisor_monitor.log"
+
+GRAFANA_PACKAGE: grafana_4.2.0_armhf.deb
+GRAFANA_CONF: /etc/grafana/grafana.ini
+GRAFANA_DB_NAME: 
+GRAFANA_DB_USER: 
+GRAFANA_DB_PASS: 
+GRAFANA_SECRET_KEY: 
