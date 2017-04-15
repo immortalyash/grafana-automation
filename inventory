@@ -3,7 +3,6 @@ external_host ansible_host=
 
 [datacenters:children]
 webservers
-dbservers
 
 [webservers]
 internal_host
